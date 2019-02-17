@@ -1,0 +1,308 @@
+
+<template>
+  <div v-show="ready" :class="$style.wrapper" id="scroller">
+    <div v-show="!isAtBeginning" :class="[$style.control, $style.prev]" :style="controlOffsetStyle" @click="prev">
+      <Arrow />
+    </div>
+    <div :class="$style.container" ref="container" id="container">
+      <div ref="scroller" id="scroller">
+        <div
+          ref="visibleItems"
+          :id="'visibleItems'+index"
+          v-for="(item, index) in visibleItems"
+          :key="index"
+          :class="$style.visibleItems"
+        >
+          <slot name="item" :item="item">{{ item }}</slot>
+        </div>
+      </div>
+    </div>
+    <div v-show="!isAtEnd" :class="[$style.control, $style.next]" :style="controlOffsetStyle" @click="next">
+      <Arrow />
+    </div>
+    <!-- invisible dom item to measure card height -->
+    <div
+      :key="index"
+      v-show="false"
+      v-for="(item, index) in items[0]"
+      ref="itemToMeasure"
+    >
+       <slot name="item" :item="item">{{ item }}</slot>
+    </div>
+  </div>
+</template>
+
+<script>
+import throttle from 'lodash.throttle';
+import smoothscroll from 'smoothscroll-polyfill';
+import Arrow from './Arrow.vue';
+
+export default {
+  components: {
+    Arrow,
+  },
+
+  data() {
+    return {
+      ready: false,
+      controlOffset: 0,
+      itemTotalWidth: 0,
+      scrollLeft: 0,
+      scrollerWidth: 0,
+      containerWidth: 0,
+      currentIndexStart: 0,
+    };
+  },
+
+  props: {
+    items: {
+      // List of items to be rendered
+      type: Array,
+      required: true,
+    },
+    controlTargetClass: {
+      type: String,
+      default: 'js-scroller-control-target',
+    },
+    breakpoints: {
+      type: Array,
+      default() {
+        return [
+          {
+            documentWidth: 0,
+            itemMinWidth: 150,
+          },
+          {
+            documentWidth: 1024,
+            itemMinWidth: 250,
+          },
+        ];
+      },
+    },
+    itemSpacing: {
+      type: Number,
+      default: 15,
+    },
+  },
+
+  methods: {
+    bindScroller() {
+      this.throttledResetScroller = throttle(() => this.resetScroller(), 100);
+
+      window.addEventListener('resize', this.throttledResetScroller);
+      this.$refs.container.addEventListener('scroll', this.updateScrollData);
+    },
+
+    resetScroller() {
+      this.containerWidth = this.$refs.container.offsetWidth;
+
+      let itemMinWidth = 0;
+
+      this.breakpoints.forEach((breakpoint) => {
+        if (document.body.clientWidth > breakpoint.documentWidth) {
+          itemMinWidth = breakpoint.itemMinWidth;
+        }
+      });
+
+      const itemMinTotalWidth = itemMinWidth + this.itemSpacing;
+      const numItems = Math.floor((this.containerWidth + this.itemSpacing) / itemMinTotalWidth);
+      const itemWidth = this.containerWidth / numItems - this.itemSpacing + this.itemSpacing / numItems;
+
+      this.scrollerWidth = Math.floor((itemWidth + this.itemSpacing) * this.items.length - this.itemSpacing);
+
+      let itemHeight = 0;
+
+      if (!this.$refs.visibleItems) {
+        return;
+      }
+
+      this.$refs.visibleItems.forEach((item, index) => {
+        item.style.width = `${itemWidth}px`;
+        item.style.transform = `translate3d(${(itemWidth + this.itemSpacing) * index}px, 0, 0)`;
+
+        itemHeight = Math.max(itemHeight, item.offsetHeight);
+      });
+
+      this.$refs.scroller.style.width = `${this.scrollerWidth}px`;
+      this.$refs.scroller.style.height = `${itemHeight}px`;
+
+      this.itemTotalWidth = itemWidth + this.itemSpacing;
+
+      this.setControlOffset();
+
+      this.ready = true;
+    },
+
+    setControlOffset() {
+      // const controlSize = 40;
+      // const controlTargetEl = this.controlTargetClass && this.$refs.visibleItems && this.$refs.visibleItems[0].querySelector(`.${this.controlTargetClass}`) || this.$refs.visibleItems[0];
+      // const targetHeight = controlTargetEl.offsetHeight;
+
+      // this.controlOffset = targetHeight / 2 - controlSize / 2;
+
+      this.controlOffset = 40;
+    },
+
+    updateScrollData() {
+      this.scrollLeft = this.$refs.container.scrollLeft;
+      const startPosition = Math.floor(this.scrollLeft / this.itemTotalWidth);
+      const endPosition = Math.floor( ( this.scrollLeft + this.containerWidth ) / this.itemTotalWidth );
+      console.log('start', startPosition);
+      console.log('end', endPosition);
+
+console.log('his.currentIndexStart', this.currentIndexStart);
+      this.$refs.visibleItems.forEach((item, index) => {
+        debugger
+        console.log(`translate3d(${(this.scrollLeft + this.itemTotalWidth) * ( this.currentIndexStart + index )}px, 0, 0)`);
+        item.style.transform = `translate3d(${(this.scrollLeft + this.itemTotalWidth) * ( this.currentIndexStart + index )}px, 0, 0)`;
+      });
+    },
+
+    prev() {
+      const left = Math.max(
+        this.scrollLeft - (this.scrollLeft % this.itemTotalWidth) - this.containerWidth - this.itemSpacing,
+        0,
+      );
+
+      this.smoothScrollTo(left);
+    },
+
+    next() {
+      const progress = this.scrollLeft + this.containerWidth;
+
+      const left = this.scrollLeft + this.containerWidth + this.itemTotalWidth - (progress % this.itemTotalWidth);
+
+      this.smoothScrollTo(left);
+    },
+
+    smoothScrollTo(left) {
+      this.$refs.container.scroll({ top: 0, left, behavior: 'smooth' });
+    },
+  },
+
+  computed: {
+    controlOffsetStyle() {
+      if (this.controlOffset) {
+        return {
+          top: `${this.controlOffset}px`,
+        };
+      }
+    },
+
+    visibleItems() {
+      if ( !this.ready ) {
+        return this.items.slice(0, 1);
+      }
+      // console.log('containerWidth', this.containerWidth);
+      // console.log('scrollLeft', this.scrollLeft);
+
+      const startPosition = Math.floor(this.scrollLeft / this.itemTotalWidth)
+      console.log('startPosition', startPosition);
+      const endPosition = Math.floor( ( this.scrollLeft + this.containerWidth ) / this.itemTotalWidth );
+      console.log('endPosition', endPosition);
+
+      // console.log('which item', this.scrollLeft - (this.scrollLeft % this.itemTotalWidth) - this.containerWidth - this.itemSpacing);
+      this.size = 10;
+      console.log('sliceStart', Math.max(0, startPosition - this.size));
+      console.log('sliceEnd', Math.min(this.items.length, startPosition + this.size));
+      // console.log('visibleItems', this.items.slice(Math.max(0, startPosition - this.size), Math.min(this.items.length, startPosition + this.size)))
+      this.currentIndexStart = startPosition;
+      return this.items.slice(Math.max(0, startPosition - 2), Math.min(this.items.length, endPosition + 2));
+    },
+
+    isAtBeginning() {
+      return this.scrollLeft === 0;
+    },
+
+    isAtEnd() {
+      return this.scrollLeft >= this.scrollerWidth - this.containerWidth;
+    },
+  },
+
+  updated() {
+    this.resetScroller();
+  },
+
+  mounted() {
+    //this.items = this.$children.filter((component) => component.$options._componentTag === 'ScrollerItem');
+    smoothscroll.polyfill();
+
+    this.resetScroller();
+    this.bindScroller();
+  },
+
+  beforeDestroy() {
+    window.removeEventListener('resize', this.throttledResetScroller);
+    this.$refs.container.removeEventListener('scroll', this.updateScrollData);
+  },
+};
+</script>
+
+<style module lang="scss">
+
+$control-size: 40px;
+
+.wrapper {
+  position: relative;
+}
+
+.container {
+  -ms-overflow-style: none;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  position: relative;
+  /* stylelint-disable */
+  scrollbar-width: none;
+  /* stylelint-enable */
+
+  &::-webkit-scrollbar {
+    height: 0;
+    width: 0;
+  }
+}
+
+.items > * {
+  display: inline-block;
+}
+
+.visibleItems {
+  display: inline-block;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.control {
+  background: white;
+  border-radius: 100px;
+  box-shadow: 0 3px 6px rgba(black, 0.16);
+  cursor: pointer;
+  height: $control-size;
+  position: absolute;
+  width: $control-size;
+  z-index: 100;
+
+  :global(svg) {
+    fill: gray;
+    height: 16px;
+    left: 16px;
+    position: absolute;
+    top: 12px;
+    width: 10px;
+  }
+
+  &.prev {
+    left: -$control-size / 2;
+
+    :global(svg) {
+      left: auto;
+      right: 16px;
+      transform: scaleX(-1);
+    }
+  }
+
+  &.next {
+    right: -$control-size / 2;
+  }
+}
+</style>
