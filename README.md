@@ -1,6 +1,8 @@
 # scroller
 
-> A Vue.js project
+Horizontal Scroller with virtualization
+
+See here: https://www.youtube.com/watch?v=PYGQtB0woGY
 
 ## Build Setup
 
