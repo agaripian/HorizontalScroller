@@ -1,6 +1,7 @@
 # scroller
 
 Horizontal Scroller with virtualization
+![alt text](https://github.com/agaripian/HorizontalScroller/blob/master/src/assets/scroller.png?raw=true)
 
 See here: https://www.youtube.com/watch?v=PYGQtB0woGY
 
