@@ -1,26 +1,35 @@
 <template>
   <div id="app">
-    <Scroller :items="scheduleList">
+    <!--<Scroller :items="scheduleList">
       <template slot="item" slot-scope="data">
-        <!-- need to implement padding bottom hack here -->
         <img :src="data.item.thumbnail_url" class="js-scroller-control-target" style="height: 142px">
         <h3> <b>{{data.item.position}}</b> : {{data.item.title}} </h3>
       </template>
-    </Scroller>
+    </Scroller> -->
+
+      <GridScroller :items="fakeItems">
+      <template slot="item" slot-scope="data">
+        <!-- need to implement padding bottom hack here -->
+        <img :src="`https://via.placeholder.com/808x632/0000FF/FFFFFF?text=${data.index}`" class="js-scroller-control-target" style="width: 100%">
+      </template>
+    </GridScroller>
   </div>
 </template>
 
 <script>
 import Scroller from './Scroller.vue';
+import GridScroller from './GridScroller.vue';
 import schedule from './schedule.js';
 export default {
   name: 'app',
   components: {
     Scroller,
+    GridScroller,
   },
   data () {
     return {
-      scheduleList: schedule.schedule
+      scheduleList: schedule.schedule,
+      fakeItems: Array(1000).fill({}),
     }
   }
 }
