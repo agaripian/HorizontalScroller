@@ -10,7 +10,7 @@
       <GridScroller :items="fakeItems">
       <template slot="item" slot-scope="data">
         <!-- need to implement padding bottom hack here -->
-        <img :src="`https://via.placeholder.com/808x632/0000FF/FFFFFF?text=${data.index}`" class="js-scroller-control-target" style="width: 100%">
+        <img :src="`https://via.placeholder.com/808x632/0000FF/FFFFFF?text=${data.item.itemIndex}`" class="js-scroller-control-target" style="width: 100%">
       </template>
     </GridScroller>
   </div>

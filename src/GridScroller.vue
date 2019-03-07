@@ -16,19 +16,17 @@
 -->
 
 <template>
-  <div :class="[$style.wrapper, 'qa-scroller-container']" ref="wrapper">
-  hiiiiii
-    <div :class="$style.container" ref="container">
-      <div v-if="renderedItems.length" ref="scroller" :class="{ [$style.grid]: !mounted }" :style="scrollerStyle">
-        <div
-          v-for="(item, index) in renderedItems"
-          :key="`scroller-item-${index}`"
-          :class="{ [$style.item]: mounted }"
-          :style="getItemStyle(item)"
-          ref="items"
-        >
-          <slot name="item" :item="item" :index="index+1" />
-        </div>
+  <div>
+    <div v-if="renderedItems.length" ref="scroller"  :style="{ 'padding-top': '500px' }">
+      <div
+        v-for="(item, index) in renderedItems"
+        :id="`scroller-item-${item.itemIndex}`"
+        :key="`scroller-item-${index}`"
+        :class="{ [$style.item]: mounted }"
+        :style="getItemStyle(item)"
+        ref="items"
+      >
+        <slot name="item" :item="item" :index="index+1" />
       </div>
     </div>
   </div>
@@ -46,6 +44,7 @@ export default {
       controlOffset: 0,
       itemTotalWidth: 0,
       itemWidth: 0,
+      itemHeight: 0,
       numItems: 0,
       scrollLeft: 0,
       scrollerWidth: 0,
@@ -53,6 +52,8 @@ export default {
       containerWidth: 0,
       measuredItems: [],
       numSsrCards: 20,
+      paddingTop: 0,
+      scrollTop: 0,
       breakpoints: [
         {
           documentWidth: 0,
@@ -98,9 +99,10 @@ export default {
   methods: {
     bindScroller() {
       this.throttledResetScroller = throttle(() => this.resetScroller(), 50);
+      this.throttledScroller = throttle(() => this.updateScrollData(), 50);
 
       window.addEventListener('resize', this.throttledResetScroller);
-      this.$refs.container.addEventListener('scroll', this.updateScrollData);
+      document.addEventListener('scroll', this.throttledScroller);
     },
 
     resetScroller() {
@@ -108,7 +110,7 @@ export default {
         return;
       }
 
-      const containerWidth = this.$refs.container.offsetWidth;
+      const containerWidth = document.body.clientWidth;
 
       if (containerWidth !== this.containerWidth) {
         this.containerWidth = containerWidth;
@@ -127,32 +129,48 @@ export default {
 
         this.itemWidth = this.containerWidth / numItems - this.itemSpacing + this.itemSpacing / numItems;
         this.itemTotalWidth = this.itemWidth + this.itemSpacing;
-        this.scrollerWidth = this.itemTotalWidth * (this.items.length - 1) + this.itemWidth;
+       // this.scrollerWidth = this.itemTotalWidth * (this.items.length - 1) + this.itemWidth;
+console.log('numitems', numItems)
 
-        this.measuredItems = this.items.map((item, index) => ({
-          ...item,
-          left: this.itemTotalWidth * index,
-        }));
+        this.measuredItems = [];
+        let count = 0;
 
-        this.$nextTick(() => {
-          if (this.firstItemEl) {
-            this.scrollerHeight = this.firstItemEl.offsetHeight;
+        this.itemHeight  = (808/632) * this.itemWidth;
+        this.items.forEach((item, index) => {
+          if (index !== 0 ){
+            count = index % numItems === 0 ? 0 : count + 1;
           }
+         // console.log(count);
+          this.measuredItems.push({
+            ...item,
+            left: this.itemTotalWidth * count,
+            top: this.itemHeight * Math.floor(index/numItems) + this.itemSpacing,
+            itemIndex: index,
+          })
+         // console.log(this.measuredItems[index].left)
         });
+
+        // this.$nextTick(() => {
+        //   if (this.firstItemEl) {
+        //     this.scrollerHeight = 500;//this.firstItemEl.offsetHeight;
+        //   }
+        // });
       }
     },
 
     getItemStyle(item) {
       if (this.mounted) {
         return {
-          transform: `translate3d(${item.left}px, 0, 0)`,
+          transform: `translate3d(${item.left}px, ${item.top}px, 0)`,
           width: `${this.itemWidth}px`,
         };
       }
     },
 
     updateScrollData() {
-      this.scrollLeft = this.$refs.container.scrollLeft;
+      this.scrollLeft = 0;
+      this.scrollTop = window.pageYOffset;
+      //console.log( this.scrollTop);
     },
 
     // prev() {
@@ -202,27 +220,49 @@ export default {
         return [];
       }
 
-      if (this.items.length < this.numSsrCards) {
-        const numItemsMissing = this.numSsrCards - this.items.length;
+      // if (this.items.length < this.numSsrCards) {
+      //   const numItemsMissing = this.numSsrCards - this.items.length;
 
-        const emptyPlaceholders = Array(numItemsMissing)
-          .fill()
-          .map(() => ({ emptyPlaceholder: true }));
+      //   const emptyPlaceholders = Array(numItemsMissing)
+      //     .fill()
+      //     .map(() => ({ emptyPlaceholder: true }));
 
-        return [...this.items, ...emptyPlaceholders];
-      }
+      //   return [...this.items, ...emptyPlaceholders];
+      // }
 
       return this.items.slice(0, this.numSsrCards);
     },
 
     visibleItems() {
-      const startPosition = Math.round(this.scrollLeft / this.itemTotalWidth);
-      const endPosition = (this.scrollLeft + (this.containerWidth + this.itemSpacing)) / this.itemTotalWidth;
+      let startPosition = -1;
+      let endPosition = -1;
+      let docHeight = window.innerHeight;
+      this.measuredItems.forEach((item, index) => {
+     //   console.log('this.scrollTop', this.scrollTop);
+     //   console.log('item.top', item.top);
+        if (startPosition === -1 && item.top > this.scrollTop) {
+          startPosition = index;
+        }
+        if (endPosition === -1 && item.top > this.scrollTop + docHeight) {
+          endPosition = index;
+        }
+        //startPosition = item.top >Math.round(this.scrollTop / this.itemTotalWidth);
+      });
 
-      const sliceStart = Math.max(0, startPosition - this.virtualizerBufferSize);
-      const sliceEnd = Math.min(this.measuredItems.length, endPosition + this.virtualizerBufferSize);
+      console.log('startPosition', startPosition)
+      console.log('endPosition', endPosition)
+      //const startPosition = Math.round(this.scrollTop / this.itemTotalWidth);
+     // const endPosition = (this.scrollLeft + (this.containerWidth + this.itemSpacing)) / this.itemTotalWidth;
+     console.log('docHeight', docHeight)
+      const bufferSize = Math.max(docHeight/(this.itemHeight + this.itemSpacing));
+      console.log('bufferSize', bufferSize)
+      const sliceStart = Math.max(0, startPosition - this.numItems * bufferSize * 2);
+      const sliceEnd = Math.min(this.measuredItems.length, endPosition + this.numItems * bufferSize * 2);
 
+console.log('sliceStart', sliceStart)
+      console.log('sliceEnd', sliceEnd)
       return this.measuredItems.slice(sliceStart, sliceEnd);
+     // return this.measuredItems.slice(0, this.numSsrCards);
     },
 
     isAtBeginning() {
@@ -269,8 +309,6 @@ $control-size: 40px;
 }
 
 .container {
-  overflow-x: scroll;
-  overflow-y: hidden;
   position: relative;
 }
 
